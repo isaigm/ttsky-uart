@@ -1,3 +1,5 @@
+`default_nettype none
+
 module uart_tx 
 #(  
     parameter BAUD_RATE = 9600,
@@ -9,17 +11,18 @@ module uart_tx
     input  wire       rst_n,       
     input  wire       start,
     input  wire [7:0] byte_in, 
-    output reg        bit_out
+    output reg        bit_out,
+    output wire       busy        
 );
-
     localparam IDLE = 2'b00;
     localparam TX   = 2'b01;
     localparam STOP = 2'b10;
-    
     reg [1:0] status;
     reg [$clog2(TOTAL_CYCLES):0] cnt;
     reg [3:0] bit_idx;  
-    
+
+    assign busy = (status != IDLE);
+
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             status  <= IDLE;
@@ -37,11 +40,9 @@ module uart_tx
                         bit_idx <= 0;
                     end
                 end
-                
                 TX: begin
                     if (cnt == TOTAL_CYCLES - 1) begin
                         cnt <= 0; 
-                        
                         if (bit_idx == 4'd8) begin
                             status  <= STOP;
                             bit_out <= 1'b1; 
@@ -53,9 +54,7 @@ module uart_tx
                         cnt <= cnt + 1'b1; 
                     end
                 end
-                
                 STOP: begin
-                  
                     if (cnt == TOTAL_CYCLES - 1) begin
                         status <= IDLE;
                         cnt    <= 0;
@@ -63,7 +62,6 @@ module uart_tx
                         cnt <= cnt + 1'b1;
                     end
                 end
-                
                 default: status <= IDLE; 
             endcase
         end
