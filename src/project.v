@@ -1,73 +1,40 @@
-module tt_um_uart_tx 
-#(  
-    parameter BAUD_RATE = 9600,
-    parameter CLK_FREQ  = 50000000,
-    parameter TOTAL_CYCLES = CLK_FREQ / BAUD_RATE 
-)
-(
-    input  wire       clk,
-    input  wire       rst_n,       
-    input  wire       start,
-    input  wire       ena,
-    input  wire [7:0] byte_in, 
-    output reg        bit_out
+/*
+ * Copyright (c) 2026 Tu Nombre / Github User
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+`default_nettype none
+
+// Este es el módulo superior (Top Module) compatible con la plantilla de Tiny Tapeout
+module tt_um_uart_tx (
+    input  wire [7:0] ui_in,    // Entradas dedicadas (mapeadas a byte_in)
+    output wire [7:0] uo_out,   // Salidas dedicadas (uo_out[0] mapeada a bit_out)
+    input  wire [7:0] uio_in,   // Bidireccionales: Entrada (uio_in[0] mapeada a start)
+    output wire [7:0] uio_out,  // Bidireccionales: Salida
+    output wire [7:0] uio_oe,   // Bidireccionales: Habilitación (0 = entrada, 1 = salida)
+    input  wire       ena,      // Siempre en 1 cuando el diseño está activo, se puede omitir
+    input  wire       clk,      // Reloj del sistema
+    input  wire       rst_n     // Reset activo en bajo (low to reset)
 );
 
-   
-    localparam IDLE = 2'b00;
-    localparam TX   = 2'b01;
-    localparam STOP = 2'b10;
-    
-    reg [1:0] status;
-    reg [$clog2(TOTAL_CYCLES):0] cnt;
-    reg [3:0] bit_idx;  
-    
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            status  <= IDLE;
-            bit_out <= 1'b1;
-            cnt     <= 0;
-            bit_idx <= 0;
-        end else begin
-            case (status)
-                IDLE: begin
-                    bit_out <= 1'b1; 
-                    if (start) begin
-                        status  <= TX;
-                        bit_out <= 1'b0; 
-                        cnt     <= 0;
-                        bit_idx <= 0;
-                    end
-                end
-                
-                TX: begin
-                    if (cnt == TOTAL_CYCLES - 1) begin
-                        cnt <= 0; 
-                        
-                        if (bit_idx == 4'd8) begin
-                            status  <= STOP;
-                            bit_out <= 1'b1; 
-                        end else begin
-                            bit_out <= byte_in[bit_idx];
-                            bit_idx <= bit_idx + 1'b1;
-                        end
-                    end else begin
-                        cnt <= cnt + 1'b1; 
-                    end
-                end
-                
-                STOP: begin
-               
-                    if (cnt == TOTAL_CYCLES - 1) begin
-                        status <= IDLE;
-                        cnt    <= 0;
-                    end else begin
-                        cnt <= cnt + 1'b1;
-                    end
-                end
-                
-                default: status <= IDLE; 
-            endcase
-        end
-    end
+    // Instancia del transmisor UART traducido anteriormente
+    uart_tx #(
+        .BAUD_RATE(9600),
+        .CLK_FREQ(50000000)
+    ) uart_tx_inst (
+        .clk(clk),
+        .rst_n(rst_n),
+        .start(uio_in[0]),      // Usamos el primer pin bidireccional como entrada 'start'
+        .byte_in(ui_in),        // Conectamos las 8 entradas dedicadas a 'byte_in'
+        .bit_out(uo_out[0])     // Conectamos el bit de salida de datos a uo_out[0]
+    );
+
+    // Todos los pines de salida no utilizados deben asignarse a 0.
+    assign uo_out[7:1] = 7'b0000000;
+    assign uio_out     = 8'b00000000;
+    assign uio_oe      = 8'b00000000; // Todos los pines bidireccionales configurados como entradas
+
+    // Lista de todas las entradas no utilizadas para evitar warnings durante la síntesis
+    wire _unused = &{1'b0, ena, uio_in[7:1]};
+
 endmodule
