@@ -8,6 +8,7 @@ module tt_um_uart_tx
     input  wire       clk,
     input  wire       rst_n,       
     input  wire       start,
+    input  wire       ena,
     input  wire [7:0] byte_in, 
     output reg        bit_out
 );
