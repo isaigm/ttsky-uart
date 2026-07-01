@@ -1,4 +1,4 @@
-module uart_tx 
+module tt_um_uart_tx 
 #(  
     parameter BAUD_RATE = 9600,
     parameter CLK_FREQ  = 50000000,
