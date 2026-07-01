@@ -1,27 +1,72 @@
-/*
- * Copyright (c) 2024 Your Name
- * SPDX-License-Identifier: Apache-2.0
- */
-
-`default_nettype none
-
-module tt_um_example (
-    input  wire [7:0] ui_in,    // Dedicated inputs
-    output wire [7:0] uo_out,   // Dedicated outputs
-    input  wire [7:0] uio_in,   // IOs: Input path
-    output wire [7:0] uio_out,  // IOs: Output path
-    output wire [7:0] uio_oe,   // IOs: Enable path (active high: 0=input, 1=output)
-    input  wire       ena,      // always 1 when the design is powered, so you can ignore it
-    input  wire       clk,      // clock
-    input  wire       rst_n     // reset_n - low to reset
+module uart_tx 
+#(  
+    parameter BAUD_RATE = 9600,
+    parameter CLK_FREQ  = 50000000,
+    parameter TOTAL_CYCLES = CLK_FREQ / BAUD_RATE 
+)
+(
+    input  wire       clk,
+    input  wire       rst_n,       
+    input  wire       start,
+    input  wire [7:0] byte_in, 
+    output reg        bit_out
 );
 
-  // All output pins must be assigned. If not used, assign to 0.
-  assign uo_out  = ui_in + uio_in;  // Example: ou_out is the sum of ui_in and uio_in
-  assign uio_out = 0;
-  assign uio_oe  = 0;
-
-  // List all unused inputs to prevent warnings
-  wire _unused = &{ena, clk, rst_n, 1'b0};
-
+   
+    localparam IDLE = 2'b00;
+    localparam TX   = 2'b01;
+    localparam STOP = 2'b10;
+    
+    reg [1:0] status;
+    reg [$clog2(TOTAL_CYCLES):0] cnt;
+    reg [3:0] bit_idx;  
+    
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            status  <= IDLE;
+            bit_out <= 1'b1;
+            cnt     <= 0;
+            bit_idx <= 0;
+        end else begin
+            case (status)
+                IDLE: begin
+                    bit_out <= 1'b1; 
+                    if (start) begin
+                        status  <= TX;
+                        bit_out <= 1'b0; 
+                        cnt     <= 0;
+                        bit_idx <= 0;
+                    end
+                end
+                
+                TX: begin
+                    if (cnt == TOTAL_CYCLES - 1) begin
+                        cnt <= 0; 
+                        
+                        if (bit_idx == 4'd8) begin
+                            status  <= STOP;
+                            bit_out <= 1'b1; 
+                        end else begin
+                            bit_out <= byte_in[bit_idx];
+                            bit_idx <= bit_idx + 1'b1;
+                        end
+                    end else begin
+                        cnt <= cnt + 1'b1; 
+                    end
+                end
+                
+                STOP: begin
+               
+                    if (cnt == TOTAL_CYCLES - 1) begin
+                        status <= IDLE;
+                        cnt    <= 0;
+                    end else begin
+                        cnt <= cnt + 1'b1;
+                    end
+                end
+                
+                default: status <= IDLE; 
+            endcase
+        end
+    end
 endmodule
